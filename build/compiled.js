@@ -183,6 +183,66 @@ newModel('Protocol',function(name, options) {
 
 
 
+newModel('Scenario', function(name) {
+    
+    var self = getSelf(this);
+    self.inherit(BaseModel);
+    
+    self.init = function() {
+        self.req = {
+            straight: {},
+            reverced: {},
+            todos: {}
+        }
+    }
+    
+    self.addNode = function(name, reqirement, todo) {
+        self.req.todos[name] = todo;
+        self.req.straight[name] = self.req.straight[name] || [];
+        self.req.straight[name] = self.req.straight[name].concat(reqirement);
+        
+        reqirement = reqirement || [];
+        reqirement.forEach(req => {
+            self.req.reverced[req] = self.req.reverced[req] || [];
+            self.req.reverced[req].push(name);
+        });
+    }
+    
+    self.markDone = function(name) {
+        var todos = self.req.reverced[name];
+        self.req.reverced[name] = [];
+        if ( todos ) {
+            todos.forEach(key => {
+                let reqs = self.req.straight[key];
+                let ind = reqs.indexOf(name);
+                if ( ind >= 0 ) {
+                    reqs.splice(ind, 1);
+                    if ( reqs.length == 0 ) {
+                        self.run(key);
+                    }
+                }
+            });
+        }
+    }
+    
+    self.run = function(name) {
+        if ( name ) {
+            //console.log(name);
+            delete self.req.straight[name];
+            self.req.todos[name](()=>{ self.markDone(name); });
+        } else {
+            for ( var key in self.req.straight ) {
+                let reqs = self.req.straight[key];
+                if ( reqs.length == 0 ) { self.run(key); }
+            }
+        }
+    }
+    
+    self.init();
+    
+});
+
+
 newModel('Storage', function(name, options) {
     
     var self = getSelf(this);
@@ -364,11 +424,11 @@ MODEL.GlobalEvent.declare.push(() => {
 MODEL.Protocol.declare.push(() => {
     
     new Protocol('slack', {
-        read: function(self, data, path, done) {
+        read: (self, data, path, done) => {
             done(data);
             EMIT('slack/'+path.split('.').join('/'), path, data);
         },
-        write: function(self, path, data, todo) {
+        write: (self, path, data, todo) => {
             todo = todo || function(resp) { console.log(resp); };
             
             ajaxRequest('POST','https://slack.com/api/'+path, data, (resp)=> {
@@ -377,6 +437,11 @@ MODEL.Protocol.declare.push(() => {
         }
     });
     window.slack = PROTOCOL.slack.write;
+    
+});
+
+
+MODEL.Scenario.declare.push(() => {
     
 });
 
@@ -404,7 +469,7 @@ MODEL.Storage.declare.push(() => {
 
 
 
-function mainScenario() {
+function mainScenario(done) {
     
     ON('slack', (method, data) => {
         console.log(method, '\n\t', data, '\n');
@@ -412,20 +477,24 @@ function mainScenario() {
     
     GLOBALEVENT.click.add((ev) => console.log('Click!'));
     
+    done();
 }
 
 
 // Start
-loadJson('config.json', function() {
-    loadJson(['locale/',config.locale,'.json'].join(''), () => {
-        declareInstances();
-        STORAGE.db.onready(mainScenario);
-    });
-});
+window.PAGE = new Scenario('page');
 
-function declareInstances() {
+PAGE.addNode('loadSettings', [], (done)=>{ loadJson('config.json', done); });
+PAGE.addNode('loadLocale', ['loadSettings'], (done)=>{ loadJson(['locale/',config.locale,'.json'].join(''), done); });
+
+PAGE.addNode('declareInstances', ['loadSettings'], (done)=>{
     for ( var name in MODEL ) {
         MODEL[name].declare.forEach(worker => worker());
     }
-}
+    done();
+});
+PAGE.addNode('loadDB', ['declareInstances'], (done)=>{ STORAGE.db.onready(done); });
+PAGE.addNode('start',['loadDB'], mainScenario);
+
+PAGE.run();
 

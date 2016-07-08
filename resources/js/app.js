@@ -1,7 +1,7 @@
 
 
 
-function mainScenario() {
+function mainScenario(done) {
     
     ON('slack', (method, data) => {
         console.log(method, '\n\t', data, '\n');
@@ -9,20 +9,24 @@ function mainScenario() {
     
     GLOBALEVENT.click.add((ev) => console.log('Click!'));
     
+    done();
 }
 
 
 // Start
-loadJson('config.json', function() {
-    loadJson(['locale/',config.locale,'.json'].join(''), () => {
-        declareInstances();
-        STORAGE.db.onready(mainScenario);
-    });
-});
+window.PAGE = new Scenario('page');
 
-function declareInstances() {
+PAGE.addNode('loadSettings', [], (done)=>{ loadJson('config.json', done); });
+PAGE.addNode('loadLocale', ['loadSettings'], (done)=>{ loadJson(['locale/',config.locale,'.json'].join(''), done); });
+
+PAGE.addNode('declareInstances', ['loadSettings'], (done)=>{
     for ( var name in MODEL ) {
         MODEL[name].declare.forEach(worker => worker());
     }
-}
+    done();
+});
+PAGE.addNode('loadDB', ['declareInstances'], (done)=>{ STORAGE.db.onready(done); });
+PAGE.addNode('start',['loadDB'], mainScenario);
+
+PAGE.run();
 
