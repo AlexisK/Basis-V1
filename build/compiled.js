@@ -56,6 +56,12 @@ function tm(todo,tmr) {
 }
 
 
+function PF(todo) {
+    var cache;
+    return () => { return cache || (cache = new Promise(todo)); };
+}
+
+
 window.MODEL = {};
 
 function inherit(ref, args) {
@@ -294,6 +300,41 @@ newModel('Storage', function(name, options) {
     
 });
 
+function $AD(obj, path, params) {
+    params = params || {};
+    
+    if ( !def(obj) ) { return null; }
+    if ( typeof(path) == 'string' ) { path = path.split('.'); }
+    
+    if ( path.length > 0 ) {
+        
+        if ( !def(obj[path[0]]) && def(params.autocreate) ) {
+            obj[path[0]] = CO(params.autocreate);
+        }
+        if ( !def(obj[path[0]]) ) {
+            if ( def(params.autocreate) ) {
+                obj[path[0]] = CO(params.autocreate);
+            } else if ( def(params.onnull) ) {
+                obj[path[0]] = params.onnull(obj, path[0], path);
+            }
+        }
+        
+        if ( path.length == 1 ) {
+            if ( params.del ) {
+                var o = obj[path[0]];
+                delete obj[path[0]];
+                return o;
+            } else if ( def(params.setVal) ) {
+                obj[path[0]] = params.setVal;
+            }
+        }
+        
+        
+        return $AD(obj[path.splice(0,1)[0]], path, params);
+    }
+    
+    return obj;
+}
 
 function ajaxRequest(method, path, data, todo) {
     if ( typeof(data) == 'function' ) {
@@ -469,7 +510,7 @@ MODEL.Storage.declare.push(() => {
 
 
 
-function mainScenario(done) {
+var mainScenario = PF((done, fail) => {
     
     ON('slack', (method, data) => {
         console.log(method, '\n\t', data, '\n');
@@ -478,12 +519,43 @@ function mainScenario(done) {
     GLOBALEVENT.click.add((ev) => console.log('Click!'));
     
     done();
-}
+});
 
 
 // Start
-window.PAGE = new Scenario('page');
 
+PAGE = {
+    loadSettings     : PF(done => { loadJson('config.json', done); }),
+    loadLocale       : PF(done => { loadJson(['locale/',config.locale,'.json'].join(''), done); }),
+    declareInstances : PF(done => {
+        for ( var name in MODEL ) {
+            MODEL[name].declare.forEach(worker => worker());
+        }
+        done();
+    }),
+    loadDB           : PF(done => { STORAGE.db.onready(done); })
+}
+
+PAGE.loadSettings()
+    .then(PAGE.loadLocale)
+    .then(PAGE.declareInstances)
+    .then(PAGE.loadDB)
+    .catch(err => {
+        console.error('Failed to initialize\n\t',err);
+        return Promise.reject();
+    })
+    .then(
+        mainScenario,
+        ()=>console.error('Returning...')
+    )
+    .catch(err => {
+        console.error('Failed during uptime\n\t',err);
+        return Promise.reject();
+    });
+
+
+/*
+window.PAGE = new Scenario('page');
 PAGE.addNode('loadSettings', [], (done)=>{ loadJson('config.json', done); });
 PAGE.addNode('loadLocale', ['loadSettings'], (done)=>{ loadJson(['locale/',config.locale,'.json'].join(''), done); });
 
@@ -497,4 +569,4 @@ PAGE.addNode('loadDB', ['declareInstances'], (done)=>{ STORAGE.db.onready(done);
 PAGE.addNode('start',['loadDB'], mainScenario);
 
 PAGE.run();
-
+*/

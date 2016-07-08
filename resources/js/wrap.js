@@ -54,3 +54,9 @@ function tm(todo,tmr) {
     tmr = tmr || 1;
     return setTimeout(todo,tmr);
 }
+
+
+function PF(todo) {
+    var cache;
+    return () => { return cache || (cache = new Promise(todo)); };
+}
