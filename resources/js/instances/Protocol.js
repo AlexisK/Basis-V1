@@ -8,12 +8,21 @@ MODEL.Protocol.declare.push(() => {
         },
         write: (self, path, data, todo) => {
             todo = todo || function(resp) { console.log(resp); };
+            data = data || {};
             
-            ajaxRequest('POST','https://slack.com/api/'+path, data, (resp)=> {
+            if ( config.slack && config.slack.token ) {
+                data.token = config.slack.token;
+            }
+            
+            var query = [];
+            for ( var k in data ) {
+                query.push(k+'='+data[k]);
+            }
+            
+            ajaxRequest('GET','https://slack.com/api/'+[path,query.join('&')].join('?'), (resp)=> {
                 self.read(resp, path, todo);
             });
         }
     });
-    window.slack = PROTOCOL.slack.write;
     
 });

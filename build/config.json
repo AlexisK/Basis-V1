@@ -1,6 +1,9 @@
 
 window.config = {
     locale: "en-US",
+    slack: {
+        token: "xoxp-58448061859-58491578132-58530912354-389ca17c3a"
+    },
     version: {
         db: 2
     },

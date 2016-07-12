@@ -17,4 +17,5 @@ MODEL.Storage.declare.push(() => {
     
     $P(window,'DB',STORAGE.db.get);
     
+    
 });

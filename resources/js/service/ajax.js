@@ -21,5 +21,5 @@ function ajaxRequest(method, path, data, todo) {
 		}
 	}
 	r.open(method, path);
-	r.send(data);
+	r.send(JSON.stringify(data));
 }

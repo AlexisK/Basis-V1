@@ -1,5 +1,5 @@
 
-newModel('Storage', function(name, options) {
+newModel('Storage', function(name, options, db) {
     
     var self = getSelf(this);
     self.inherit(BaseModel);
@@ -12,11 +12,14 @@ newModel('Storage', function(name, options) {
         self.name = name;
         
         self.options = mergeObjects({
+            init: (self, done) => done(),
             save: (self, done) => done(),
             load: (self, done) => done()
         }, options);
         
-        self.load();
+        self.db = db || {};
+        
+        self.options.init(self,self.load);
         
         STORAGE[name] = self;
     }

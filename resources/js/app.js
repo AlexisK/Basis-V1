@@ -2,14 +2,21 @@
 
 
 var mainScenario = PF((done, fail) => {
+    // GLOBALEVENT.click.add((ev) => console.log('Click!'));
     
-    ON('slack', (method, data) => {
-        console.log(method, '\n\t', data, '\n');
+    
+    slack.req('auth.test').then(data=> console.log(data));
+    slack.req('channels.list').then(data=>{
+        console.log(data);
     });
+    slack.when_ready(()=>{ console.log('All done!', slack.db.channel, slack.db.user); })
     
-    GLOBALEVENT.click.add((ev) => console.log('Click!'));
     
     done();
+});
+
+var failScenario = PF(done => {
+    console.error('Aborting application runtime...');
 });
 
 
@@ -37,10 +44,11 @@ PAGE.loadSettings()
     })
     .then(
         mainScenario,
-        ()=>console.error('Returning...')
+        failScenario
     )
     .catch(err => {
         console.error('Failed during uptime\n\t',err);
+        failScenario();
         return Promise.reject();
     });
 
